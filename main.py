@@ -11,10 +11,12 @@ from torch import optim, nn
 from torch.utils.data import DataLoader
 
 # network and periphery
+from torchvision.transforms import transforms
+
 import ADNetFactory
 from ADDataset import ADDataset
 # constants
-from ADTrainTransformation import ADTrainTransformation
+from ADTrainTransformation import ADTrainTransformation, ToTensor
 from AverageMeter import AverageMeter
 from DeviceProvider import DeviceProvider
 from ad_net_constants import DATA_LOADER_BATCH_SIZE, WEIGHT_DECAY, \
@@ -90,9 +92,15 @@ def _load_state_if_exist(model, optimizer):
 
 
 def _create_data_set(m_seed):
-    test_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4', 'test', m_seed)
-    validation_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4', 'validation', m_seed)
-    train_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4', 'train', m_seed, ADTrainTransformation())
+    train_data_transformation = transforms.Compose([ADTrainTransformation(), ToTensor()])
+    evaluate_data_transformation = transforms.Compose([ToTensor()])
+
+    test_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4',
+                              'test', m_seed, evaluate_data_transformation)
+    train_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4',
+                               'train', m_seed, train_data_transformation)
+    validation_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4',
+                                    'validation', m_seed, evaluate_data_transformation)
 
     return test_data_set, validation_data_set, train_data_set
 
