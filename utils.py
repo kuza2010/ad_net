@@ -19,7 +19,8 @@ def save_model(path_to_save, model, optimizer, epoch):
     torch.save(all_state, path_to_save)
 
 
-def save_history(path_to_save, accuracy_history: AccuracyHistory, loss_history: LossHistory):
+def save_history(accuracy_history: AccuracyHistory,
+                 loss_history: LossHistory):
     loss = json.dumps(loss_history.history, indent=2)
     acc = json.dumps(accuracy_history.history, indent=2)
 

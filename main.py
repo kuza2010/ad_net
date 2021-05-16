@@ -87,9 +87,9 @@ def _load_state_if_exist(model, optimizer):
             optimizer.load_state_dict(optim_state)
         except EOFError:
             epoch = 0
-            print('Can not load state for some reason. Start learning from baby step.')
+            print('Can not load state for some reason.')
     else:
-        print('No model and optim detected. Start learning from baby step.')
+        print('No model and optim detected.')
 
     print(f'Start epoch is: {epoch}')
     return epoch
@@ -222,6 +222,7 @@ def main():
     best_accuracy = 0.0
     train_loss_history = LossHistory()
     validation_accuracy_history = AccuracyHistory()
+
     for epoch in range(start_epoch, EPOCH):
         # train
         train_model(model, train_dataloader, optimizer, epoch, train_loss_history)
@@ -239,8 +240,8 @@ def main():
     # load best network parameter to test
     _load_state_if_exist(model, optimizer)
     evaluate_model(model, device, test_dataloader, False)
-
-    # !!!!!!!!!!!!!!!!!!!!!!!!!
+    # save history to file
+    utils.save_history(validation_accuracy_history, train_loss_history)
     # print(model.info((1, 256, 256)))
 
 
