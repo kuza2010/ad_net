@@ -1,5 +1,3 @@
-import glob
-import os
 import random
 import time
 
@@ -8,13 +6,12 @@ import numpy as np
 # torch
 import torch
 from torch import optim, nn
-from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
 # network and periphery
 import ADNetFactory
-import utils
-from ADDataset import ADDataset
+import file_utils
+import network_utils
 # constants
 from ADTrainTransformation import ADTrainTransformation, ToTensor
 from AverageMeter import AverageMeter, LossHistory, AccuracyHistory
@@ -23,7 +20,6 @@ from ad_net_constants import DATA_LOADER_BATCH_SIZE, WEIGHT_DECAY, \
     LEARNING_RATE, MOMENTUM, DECAY_EPOCH, LR_GAMMA, EPOCH
 
 MODEL_STATE_RELATIVE_PATH = './model/state/'
-MODEL_TRAIN_HISTORY = './model/history/'
 
 
 def _main_decorator(func):
@@ -48,78 +44,6 @@ def _main_decorator(func):
 
 def _provide_data_loader_kwargs():
     return {'num_workers': 1, 'pin_memory': True}
-
-
-def _provide_optim(model, wd, lr, momentum):
-    params_wd, params_rest = [], []
-    params = model.parameters()
-
-    for param_item in params:
-        if param_item.requires_grad:
-            (params_wd if param_item.dim() != 1 else params_rest).append(param_item)
-
-    param_groups = [
-        {'params': params_wd, 'weight_decay': wd},
-        {'params': params_rest}
-    ]
-    optimizer = optim.SGD(param_groups, lr=lr, momentum=momentum)
-    return optimizer
-
-
-def _provide_learning_scheduler(optimizer, de, lrg):
-    return optim.lr_scheduler.MultiStepLR(optimizer, milestones=de, gamma=lrg)
-
-
-def _load_state_if_exist(model, optimizer):
-    epoch = 0
-
-    if os.path.exists(MODEL_STATE_RELATIVE_PATH) and len(os.listdir(MODEL_STATE_RELATIVE_PATH)) >= 1:
-        try:
-            state_to_load_path = max(glob.glob(MODEL_STATE_RELATIVE_PATH + '*'), key=os.path.getctime)
-            print(f'Load state from `{os.path.abspath(state_to_load_path)}`')
-
-            state = torch.load(state_to_load_path)
-            model_state = state['model_state']
-            optim_state = state['optim_state']
-            epoch = state['epoch']
-
-            model.load_state_dict(model_state)
-            optimizer.load_state_dict(optim_state)
-        except EOFError:
-            epoch = 0
-            print('Can not load state for some reason.')
-    else:
-        print('No model and optim detected.')
-
-    print(f'Start epoch is: {epoch}')
-    return epoch
-
-
-def _create_data_set(m_seed):
-    train_data_transformation = transforms.Compose([ADTrainTransformation(), ToTensor()])
-    evaluate_data_transformation = transforms.Compose([ToTensor()])
-
-    test_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4',
-                              'test', m_seed, evaluate_data_transformation)
-    train_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4',
-                               'train', m_seed, train_data_transformation)
-    validation_data_set = ADDataset('./data/bossbase/bossbase_v.0.93/boss_256_0.4',
-                                    'validation', m_seed, evaluate_data_transformation)
-
-    return test_data_set, validation_data_set, train_data_set
-
-
-def _create_data_loaders(t_ds, v_ds, test_ds,
-                         train_kwargs, validation_kwargs=None, test_kwargs=None):
-    if test_kwargs is None:
-        test_kwargs = {}
-    if validation_kwargs is None:
-        validation_kwargs = {}
-    test_dataloader = DataLoader(test_ds, batch_size=DATA_LOADER_BATCH_SIZE, shuffle=True, **test_kwargs)
-    train_dataloader = DataLoader(t_ds, batch_size=DATA_LOADER_BATCH_SIZE, shuffle=True, **train_kwargs)
-    validation_dataloader = DataLoader(v_ds, batch_size=DATA_LOADER_BATCH_SIZE, shuffle=False, **validation_kwargs)
-
-    return test_dataloader, validation_dataloader, train_dataloader
 
 
 def train_model(model, train_loader, optimizer, epoch, tlh):
@@ -190,7 +114,7 @@ def evaluate_model(model, m_device, eval_loader, is_validation=False,
         # append to history
         vah.append(epoch, accuracy)
         if accuracy > best_acc:
-            utils.save_model(MODEL_STATE_RELATIVE_PATH, model, optimizer, epoch)
+            file_utils.save_model(MODEL_STATE_RELATIVE_PATH, model, optimizer, epoch)
 
     print('-' * 25)
     print(f'Epoch {epoch}\t'
@@ -204,20 +128,28 @@ def evaluate_model(model, m_device, eval_loader, is_validation=False,
 @_main_decorator
 def main():
     # create dataset
-    test_data_set, validation_data_set, train_data_set = _create_data_set(seed)
+    test_data_set, validation_data_set, train_data_set = network_utils.get_data_set(
+        m_seed=seed,
+        train_transforms=transforms.Compose([ADTrainTransformation(), ToTensor()]),
+        test_transforms=transforms.Compose([ToTensor()]),
+        validation_transforms=transforms.Compose([ToTensor()])
+    )
     # create data loaders
-    test_dataloader, validation_dataloader, train_dataloader = _create_data_loaders(train_data_set,
-                                                                                    validation_data_set,
-                                                                                    test_data_set,
-                                                                                    _provide_data_loader_kwargs())
+    test_dataloader, validation_dataloader, train_dataloader = network_utils.get_data_loaders(
+        train_data_set,
+        validation_data_set,
+        test_data_set,
+        DATA_LOADER_BATCH_SIZE,
+        _provide_data_loader_kwargs())
+
     # create model
     model = ADNetFactory.build(device)
     # create optimizer
-    optimizer = _provide_optim(model, WEIGHT_DECAY, LEARNING_RATE, MOMENTUM)
+    optimizer = network_utils.get_optimizer(model, WEIGHT_DECAY, LEARNING_RATE, MOMENTUM)
     # load prev network state
-    start_epoch = _load_state_if_exist(model, optim)
+    start_epoch = network_utils.load_state(model, optim, MODEL_STATE_RELATIVE_PATH)
     # add learning scheduler
-    scheduler = _provide_learning_scheduler(optimizer, DECAY_EPOCH, LR_GAMMA)
+    scheduler = network_utils.get_learning_scheduler(optimizer, DECAY_EPOCH, LR_GAMMA)
 
     best_accuracy = 0.0
     train_loss_history = LossHistory()
@@ -238,10 +170,10 @@ def main():
         scheduler.step()
 
     # load best network parameter to test
-    _load_state_if_exist(model, optimizer)
+    network_utils.load_state(model, optimizer, MODEL_STATE_RELATIVE_PATH)
     evaluate_model(model, device, test_dataloader, False)
     # save history to file
-    utils.save_history(validation_accuracy_history, train_loss_history)
+    file_utils.save_history(validation_accuracy_history, train_loss_history)
     # print(model.info((1, 256, 256)))
 
 

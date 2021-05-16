@@ -8,7 +8,7 @@ EPOCH = 300
 
 # batch size for data loader
 # 8 cover/stego pairs
-DATA_LOADER_BATCH_SIZE = 1
+DATA_LOADER_BATCH_SIZE = 16
 
 # optimizer hyper parameters
 MOMENTUM = 0.9
