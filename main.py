@@ -9,7 +9,6 @@ import numpy as np
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
-
 # network and periphery
 from torchvision.transforms import transforms
 
@@ -17,10 +16,10 @@ import ADNetFactory
 from ADDataset import ADDataset
 # constants
 from ADTrainTransformation import ADTrainTransformation, ToTensor
-from AverageMeter import AverageMeter
+from AverageMeter import AverageMeter, LossHistory
 from DeviceProvider import DeviceProvider
 from ad_net_constants import DATA_LOADER_BATCH_SIZE, WEIGHT_DECAY, \
-    LEARNING_RATE, MOMENTUM, DECAY_EPOCH, LR_GAMMA
+    LEARNING_RATE, MOMENTUM, DECAY_EPOCH, LR_GAMMA, EPOCH
 
 LOAD_STATE_RELATIVE_PATH = './model/load/'
 SAVE_STATE_RELATIVE_PATH = './model/save/'
@@ -50,7 +49,7 @@ def _provide_data_loader_kwargs():
     return {'num_workers': 1, 'pin_memory': True}
 
 
-def _provide_optim(model, wd, lr, momentum, de, lrg):
+def _provide_optim(model, wd, lr, momentum):
     params_wd, params_rest = [], []
     params = model.parameters()
 
@@ -63,8 +62,11 @@ def _provide_optim(model, wd, lr, momentum, de, lrg):
         {'params': params_rest}
     ]
     optimizer = optim.SGD(param_groups, lr=lr, momentum=momentum)
-    learning_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=de, gamma=lrg)
-    return [optimizer, learning_scheduler]
+    return optimizer
+
+
+def _provide_learning_scheduler(optimizer, de, lrg):
+    return optim.lr_scheduler.MultiStepLR(optimizer, milestones=de, gamma=lrg)
 
 
 def _load_state_if_exist(model, optimizer):
@@ -88,6 +90,7 @@ def _load_state_if_exist(model, optimizer):
     else:
         print('No model and optim detected. Start learning from baby step.')
 
+    print(f'Start epoch is: {epoch}')
     return epoch
 
 
@@ -113,20 +116,17 @@ def _create_data_loaders(t_ds, v_ds, test_ds,
         validation_kwargs = {}
     test_dataloader = DataLoader(test_ds, batch_size=DATA_LOADER_BATCH_SIZE, shuffle=True, **test_kwargs)
     train_dataloader = DataLoader(t_ds, batch_size=DATA_LOADER_BATCH_SIZE, shuffle=True, **train_kwargs)
-    validation_dataloader = DataLoader(v_ds, batch_size=DATA_LOADER_BATCH_SIZE, shuffle=True, **validation_kwargs)
+    validation_dataloader = DataLoader(v_ds, batch_size=DATA_LOADER_BATCH_SIZE, shuffle=False, **validation_kwargs)
 
     return test_dataloader, validation_dataloader, train_dataloader
 
 
-def train(model, train_loader, optimizer, epoch):
-    model.train()
-    time_meter = AverageMeter()
-    train_loss = AverageMeter()
+def train(model, train_loader, optimizer, epoch, tlh):
+    _time_meter = AverageMeter()
+    _train_loss = AverageMeter()
     criterion = nn.CrossEntropyLoss()
+    model.train()
 
-    # train_loaders 7200 pair [cover:stego]
-    # 450 iter (each 16 pair [cover:stego])
-    #                        [0,1]
     for batch_num, entry in enumerate(train_loader):
         batch_time = time.time()
         images, target = entry['images'], entry['label']
@@ -149,12 +149,16 @@ def train(model, train_loader, optimizer, epoch):
         # update weights
         optimizer.step()
         # compute loss
-        train_loss.update(loss.item(), images.size(0))
 
-        time_meter.update(time.time() - batch_time)
+        _train_loss.update(loss.item(), images.size(0))
+        _time_meter.update(time.time() - batch_time)
         print(f'Epoch: [{epoch + 1}][{batch_num + 1}/{len(train_loader)}]\t'
-              f'Mini-batch time {time_meter.val:.3f} ({time_meter.avg:.3f})\t'
-              f'Loss {train_loss.val:.4f} ({train_loss.avg:.4f})\t')
+              f'Mini-batch time {_time_meter.val:.3f} avg({_time_meter.avg:.3f})\t'
+              f'Loss {_train_loss.val:.4f} ({_train_loss.avg:.4f})\t')
+
+        if batch_num % 50 == 0:
+            tlh.append(_train_loss.avg, batch_num)
+            print(tlh)
 
 
 def evaluate(model, m_device, data_loader, epoch, optimizer, best_acc, PARAMS_PATH):
@@ -171,26 +175,22 @@ def main():
                                                                                     validation_data_set,
                                                                                     test_data_set,
                                                                                     _provide_data_loader_kwargs())
-
     # create model
     model = ADNetFactory.build(device)
     # create optimizer
-    optimizer, scheduler = _provide_optim(model,
-                                          WEIGHT_DECAY,
-                                          LEARNING_RATE,
-                                          MOMENTUM,
-                                          DECAY_EPOCH,
-                                          LR_GAMMA)
-    best_accuracy = 0.0
+    optimizer = _provide_optim(model, WEIGHT_DECAY, LEARNING_RATE, MOMENTUM)
+    # load prev network state
     start_epoch = _load_state_if_exist(model, optim)
-    print(f'Start epoch is: {start_epoch}')
+    # add learning scheduler
+    scheduler = _provide_learning_scheduler(optimizer, DECAY_EPOCH, LR_GAMMA)
 
-    for epoch in range(start_epoch, 1):
+    best_accuracy = 0.0
+    train_loss_history = LossHistory()
+    for epoch in range(start_epoch, EPOCH):
         # train
-        train(model, train_dataloader, optimizer, epoch)
+        train(model, train_dataloader, optimizer, epoch, train_loss_history)
         # validate
         best_accuracy = evaluate(model, device, validation_dataloader, epoch, optimizer, best_accuracy, '')
-
         scheduler.step()
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!
