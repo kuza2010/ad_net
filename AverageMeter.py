@@ -34,3 +34,19 @@ class LossHistory:
 
     def append(self, val, iteration):
         self.history.append({'val': val, 'iteration': iteration})
+
+
+class AccuracyHistory:
+    def __init__(self):
+        self.history = []
+
+    def __str__(self) -> str:
+        return '; '.join(
+            [f'epoch [#{entry["epoch"]}], accuracy {entry["accuracy"]:.4f}' for entry in self.history]
+        )
+
+    def reset(self):
+        self.history.clear()
+
+    def append(self, epoch, accuracy):
+        self.history.append({'epoch': epoch, 'accuracy': accuracy})

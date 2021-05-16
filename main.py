@@ -9,20 +9,21 @@ import numpy as np
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader
-# network and periphery
 from torchvision.transforms import transforms
 
+# network and periphery
 import ADNetFactory
+import utils
 from ADDataset import ADDataset
 # constants
 from ADTrainTransformation import ADTrainTransformation, ToTensor
-from AverageMeter import AverageMeter, LossHistory
+from AverageMeter import AverageMeter, LossHistory, AccuracyHistory
 from DeviceProvider import DeviceProvider
 from ad_net_constants import DATA_LOADER_BATCH_SIZE, WEIGHT_DECAY, \
     LEARNING_RATE, MOMENTUM, DECAY_EPOCH, LR_GAMMA, EPOCH
 
-LOAD_STATE_RELATIVE_PATH = './model/load/'
-SAVE_STATE_RELATIVE_PATH = './model/save/'
+MODEL_STATE_RELATIVE_PATH = './model/state/'
+MODEL_TRAIN_HISTORY = './model/history/'
 
 
 def _main_decorator(func):
@@ -72,9 +73,9 @@ def _provide_learning_scheduler(optimizer, de, lrg):
 def _load_state_if_exist(model, optimizer):
     epoch = 0
 
-    if os.path.exists(LOAD_STATE_RELATIVE_PATH) and len(os.listdir(LOAD_STATE_RELATIVE_PATH)) >= 1:
+    if os.path.exists(MODEL_STATE_RELATIVE_PATH) and len(os.listdir(MODEL_STATE_RELATIVE_PATH)) >= 1:
         try:
-            state_to_load_path = max(glob.glob(LOAD_STATE_RELATIVE_PATH + '*'), key=os.path.getctime)
+            state_to_load_path = max(glob.glob(MODEL_STATE_RELATIVE_PATH + '*'), key=os.path.getctime)
             print(f'Load state from `{os.path.abspath(state_to_load_path)}`')
 
             state = torch.load(state_to_load_path)
@@ -121,7 +122,7 @@ def _create_data_loaders(t_ds, v_ds, test_ds,
     return test_dataloader, validation_dataloader, train_dataloader
 
 
-def train(model, train_loader, optimizer, epoch, tlh):
+def train_model(model, train_loader, optimizer, epoch, tlh):
     _time_meter = AverageMeter()
     _train_loss = AverageMeter()
     criterion = nn.CrossEntropyLoss()
@@ -158,12 +159,46 @@ def train(model, train_loader, optimizer, epoch, tlh):
 
         if batch_num % 50 == 0:
             tlh.append(_train_loss.avg, batch_num)
-            print(tlh)
 
 
-def evaluate(model, m_device, data_loader, epoch, optimizer, best_acc, PARAMS_PATH):
+def evaluate_model(model, m_device, eval_loader, is_validation=False,
+                   epoch=None, optimizer=None, best_acc=None, vah=None):
+    correct = 0.0
     model.eval()
-    return 100.0
+
+    # do evaluation
+    with torch.no_grad():
+        for entry in eval_loader:
+            images, target = entry['images'], entry['label']
+
+            shape = list(images.size())
+            images = images.reshape(shape[0] * shape[1], *shape[2:])
+            target = target.reshape(-1)
+
+            images = images.to(m_device.device)
+            target = target.to(m_device.device)
+
+            # forward propagation
+            output = model(images)
+            # get predictions from the maximum value
+            prediction = output.max(1, keepdim=True)
+            prediction_tensor = prediction[1]
+            correct += prediction_tensor.eq(target.view_as(prediction_tensor)).sum().item()
+
+    accuracy = correct / (len(eval_loader.dataset) * 2)
+    if is_validation:
+        # append to history
+        vah.append(epoch, accuracy)
+        if accuracy > best_acc:
+            utils.save_model(MODEL_STATE_RELATIVE_PATH, model, optimizer, epoch)
+
+    print('-' * 25)
+    print(f'Epoch {epoch}\t'
+          f'Eval accuracy: {accuracy:.4f}\t'
+          f'Best accuracy: {best_acc}')
+    print('-' * 25)
+
+    return best_acc
 
 
 @_main_decorator
@@ -186,12 +221,24 @@ def main():
 
     best_accuracy = 0.0
     train_loss_history = LossHistory()
+    validation_accuracy_history = AccuracyHistory()
     for epoch in range(start_epoch, EPOCH):
         # train
-        train(model, train_dataloader, optimizer, epoch, train_loss_history)
+        train_model(model, train_dataloader, optimizer, epoch, train_loss_history)
         # validate
-        best_accuracy = evaluate(model, device, validation_dataloader, epoch, optimizer, best_accuracy, '')
+        best_accuracy = evaluate_model(model=model,
+                                       m_device=device,
+                                       eval_loader=validation_dataloader,
+                                       is_validation=True,
+                                       epoch=epoch,
+                                       optimizer=optimizer,
+                                       best_acc=best_accuracy,
+                                       vah=validation_accuracy_history)
         scheduler.step()
+
+    # load best network parameter to test
+    _load_state_if_exist(model, optimizer)
+    evaluate_model(model, device, test_dataloader, False)
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!
     # print(model.info((1, 256, 256)))
