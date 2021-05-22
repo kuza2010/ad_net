@@ -82,7 +82,7 @@ def train_model(model, train_loader, optimizer, epoch, tlh):
               f'Loss {_train_loss.val:.4f} ({_train_loss.avg:.4f})\t')
 
         if batch_num % 50 == 0:
-            tlh.append(_train_loss.avg, batch_num)
+            tlh.append(_train_loss.avg, epoch * len(train_loader) + batch_num)
 
 
 def evaluate_model(model, m_device, eval_loader, is_validation=False,
@@ -147,7 +147,7 @@ def main():
     # create optimizer
     optimizer = network_utils.get_optimizer(model, WEIGHT_DECAY, LEARNING_RATE, MOMENTUM)
     # load prev network state
-    start_epoch = network_utils.load_state(model, optim, MODEL_STATE_RELATIVE_PATH)
+    start_epoch = network_utils.load_state(model, optimizer, MODEL_STATE_RELATIVE_PATH)
     # add learning scheduler
     scheduler = network_utils.get_learning_scheduler(optimizer, DECAY_EPOCH, LR_GAMMA)
 

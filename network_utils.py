@@ -34,7 +34,7 @@ def get_data_set(m_seed, train_transforms, test_transforms, validation_transform
 
 
 def get_learning_scheduler(optimizer, milestones, gamma):
-    return optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+    return optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma, verbose=True)
 
 
 def get_optimizer(model, weight_decay, learning_rate, momentum):

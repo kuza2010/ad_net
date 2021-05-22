@@ -13,9 +13,9 @@ def init_weights(module):
         nn.init.constant_(module.bias.data, val=0)
 
 
-def build(device):
+def build(m_device):
     model = ADNet()
     model.apply(init_weights)
-    model.to(device.device)
+    model.to(m_device.device)
 
     return model

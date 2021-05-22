@@ -1,4 +1,3 @@
-import glob
 import json
 import os
 import shutil
@@ -30,11 +29,11 @@ def save_history(accuracy_history: AccuracyHistory,
 
     with open('model-accuracy.json', 'w') as outfile:
         json.dump(acc, outfile, indent=4, sort_keys=True, separators=(',', ': '))
-        print(f'Save model loss to model-accuracy.json')
+        print(f'Save model loss to {os.path.abspath("model-accuracy.json")}')
 
     with open('model-loss.json', 'w') as outfile:
         json.dump(loss, outfile, indent=4, sort_keys=True, separators=(',', ': '))
-        print(f'Save model accuracy to model-loss.json')
+        print(f'Save model accuracy to {os.path.abspath("model-loss.json")}')
 
 
 def _clear_folder(path):

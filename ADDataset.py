@@ -12,6 +12,7 @@ import ad_net_constants
 
 
 class ADDataset(Dataset):
+
     def __init__(self, _img_dir: str, _type: str, seed, transform=None):
         random.seed(seed)
 
@@ -30,7 +31,7 @@ class ADDataset(Dataset):
         elif _type == 'test':
             self.image_list = image_names[900:1800]
         elif _type == 'train':
-            self.image_list = image_names[1800:9000]
+            self.image_list = image_names[1800:1816]
         else:
             raise RuntimeError('Only `validation, test, train` values available!')
 
