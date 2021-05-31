@@ -81,8 +81,7 @@ def train_model(model, train_loader, optimizer, epoch, tlh):
               f'Mini-batch time {_time_meter.val:.3f} avg({_time_meter.avg:.3f})\t'
               f'Loss {_train_loss.val:.4f} ({_train_loss.avg:.4f})\t')
 
-        if batch_num % 50 == 0:
-            tlh.append(_train_loss.avg, epoch * len(train_loader) + batch_num)
+    tlh.append(_train_loss.avg, epoch)
 
 
 def evaluate_model(model, m_device, eval_loader, is_validation=False,

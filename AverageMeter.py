@@ -26,14 +26,14 @@ class LossHistory:
 
     def __str__(self) -> str:
         return '; '.join(
-            [f'iteration [#{entry["iteration"]}], loss {entry["val"]:.4f}' for entry in self.history]
+            [f'epoch [#{entry["epoch"]}], loss {entry["val"]:.4f}' for entry in self.history]
         )
 
     def reset(self):
         self.history.clear()
 
-    def append(self, val, iteration):
-        self.history.append({'val': val, 'iteration': iteration})
+    def append(self, val, epoch):
+        self.history.append({'val': val, 'epoch': epoch})
 
 
 class AccuracyHistory:
