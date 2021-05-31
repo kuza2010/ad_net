@@ -9,7 +9,7 @@ from torch import nn
 from torchvision.transforms import transforms
 
 # network and periphery
-from cnn import ADNetFactory, network_utils, file_utils
+from cnn import file_utils, ADNetFactory, network_utils
 # constants
 from cnn.ADTrainTransformation import ADTrainTransformation, ToTensor
 from cnn.AverageMeter import AverageMeter, LossHistory, AccuracyHistory

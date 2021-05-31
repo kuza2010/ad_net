@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torchsummary import summary
 
 # kernels
-from srm_filter_kernel import normalized_hpf_5x5_list, normalized_hpf_3x3_list
+from cnn.srm_filter_kernel import normalized_hpf_5x5_list, normalized_hpf_3x3_list
 
 
 # Image preprocessing

@@ -8,7 +8,7 @@ from matplotlib import image as mImage
 from torch.utils.data import Dataset
 
 # constants
-import ad_net_constants
+from cnn import ad_net_constants
 
 
 class ADDataset(Dataset):
