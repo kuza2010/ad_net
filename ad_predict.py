@@ -85,14 +85,14 @@ def interpret_prediction(output,
     cover_percentage, stego_percentage = output[0].numpy()
     if prediction_tensor[0].numpy()[0] == 0:
         history[idx] = {
-            'imageName': image_name,
+            'imageName': os.path.basename(image_name),
             'probability': f'{cover_percentage:.4f}/{stego_percentage:.4f}',
             'result': 'STEGO'
         }
         # print(f'{idx + 1}) Image {image_name}\t[{cover_percentage:.4f}/{stego_percentage:.4f}] \tCOVER')
     else:
         history[idx] = {
-            'imageName': image_name,
+            'imageName': os.path.basename(image_name),
             'probability': f'{cover_percentage:.4f}/{stego_percentage:.4f}',
             'result': 'STEGO'
         }
