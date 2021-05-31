@@ -12,7 +12,7 @@ acc = {
     'accuracy': []
 }
 
-with open('./acc_and_loss/model-loss-tmp.json', 'r') as outfile:
+with open('../acc_and_loss/model-loss-tmp.json', 'r') as outfile:
     data = outfile.read().replace("\\", "")
     data = data[1:-1]
     data = json.loads(data)
@@ -22,7 +22,7 @@ with open('./acc_and_loss/model-loss-tmp.json', 'r') as outfile:
 
     print(losses)
 
-with open('./acc_and_loss/model-accuracy-tmp.json', 'r') as outfile:
+with open('../acc_and_loss/model-accuracy-tmp.json', 'r') as outfile:
     data = outfile.read().replace("\\", "")
     data = data[1:-1]
     data = json.loads(data)

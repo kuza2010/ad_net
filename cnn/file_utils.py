@@ -4,7 +4,7 @@ import shutil
 
 import torch
 
-from AverageMeter import AccuracyHistory, LossHistory
+from cnn.AverageMeter import AccuracyHistory, LossHistory
 
 
 def save_model(path_to_save, model, optimizer, epoch):

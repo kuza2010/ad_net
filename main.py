@@ -5,18 +5,16 @@ import time
 import numpy as np
 # torch
 import torch
-from torch import optim, nn
+from torch import nn
 from torchvision.transforms import transforms
 
 # network and periphery
-import ADNetFactory
-import file_utils
-import network_utils
+from cnn import ADNetFactory, network_utils, file_utils
 # constants
-from ADTrainTransformation import ADTrainTransformation, ToTensor
-from AverageMeter import AverageMeter, LossHistory, AccuracyHistory
-from DeviceProvider import DeviceProvider
-from ad_net_constants import DATA_LOADER_BATCH_SIZE, WEIGHT_DECAY, \
+from cnn.ADTrainTransformation import ADTrainTransformation, ToTensor
+from cnn.AverageMeter import AverageMeter, LossHistory, AccuracyHistory
+from cnn.DeviceProvider import DeviceProvider
+from cnn.ad_net_constants import DATA_LOADER_BATCH_SIZE, WEIGHT_DECAY, \
     LEARNING_RATE, MOMENTUM, DECAY_EPOCH, LR_GAMMA, EPOCH
 
 MODEL_STATE_RELATIVE_PATH = './model/state/'

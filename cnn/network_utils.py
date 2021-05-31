@@ -5,7 +5,7 @@ import torch
 from torch import optim
 from torch.utils.data import DataLoader
 
-from ADDataset import ADDataset
+from cnn.ADDataset import ADDataset
 
 
 def get_data_loaders(t_ds, v_ds, test_ds, batch_size,
