@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import sys
 
 import numpy
 import torch
@@ -31,17 +32,20 @@ def predict(pretrained_model_path,
             image_path,
             version):
     # do some checks
-    if not os.path.exists(pretrained_model_path):
-        print(f'Model not found, path {pretrained_model_path}')
-        exit(-1)
     if not os.path.exists(image_path):
-        print(f'Image not found, path {image_path}')
+        err = {'errorMessage': f'Image not found, path {image_path}'}
+        print(json.dumps(err))
+        exit(-1)
+    if not os.path.exists(pretrained_model_path):
+        err = {'errorMessage': f'Model not found, path {pretrained_model_path}'}
+        print(json.dumps(err))
         exit(-1)
     if AD_NET_VERSIONS.get(version) is None:
-        print(f'Version {version} does not exist. Available: [{list(AD_NET_VERSIONS.keys())}]')
+        err = {'errorMessage': f'Version {version} does not exist. Available: [{list(AD_NET_VERSIONS.keys())}]'}
+        print(json.dumps(err))
         exit(-1)
 
-    final_json = {}
+    final_json = []
 
     # load state
     net = AD_NET_VERSIONS.get(version)['model']
@@ -55,7 +59,7 @@ def predict(pretrained_model_path,
             images = os.listdir(args.image)
             for idx, val in enumerate(images):
                 output = proceed(image_path + '/' + val, net)
-                interpret_prediction(output, val, final_json, idx)
+                interpret_prediction(output, val, final_json)
         else:
             output = proceed(image_path, net)
             interpret_prediction(output, image_path, final_json)
@@ -77,26 +81,25 @@ def proceed(path_to_image,
 
 def interpret_prediction(output,
                          image_name,
-                         history,
-                         idx=0):
+                         history):
     prediction = output.max(1, keepdim=True)
     prediction_tensor = prediction[1]
 
     cover_percentage, stego_percentage = output[0].numpy()
     if prediction_tensor[0].numpy()[0] == 0:
-        history[idx] = {
+        history.append({
             'imageName': os.path.basename(image_name),
             'probability': f'{cover_percentage:.4f}/{stego_percentage:.4f}',
-            'result': 'STEGO'
-        }
-        # print(f'{idx + 1}) Image {image_name}\t[{cover_percentage:.4f}/{stego_percentage:.4f}] \tCOVER')
+            'result': 'COVER'
+        })
+        # print(f'Image {image_name}\t[{cover_percentage:.4f}/{stego_percentage:.4f}] \tCOVER')
     else:
-        history[idx] = {
+        history.append({
             'imageName': os.path.basename(image_name),
             'probability': f'{cover_percentage:.4f}/{stego_percentage:.4f}',
             'result': 'STEGO'
-        }
-        # print(f'{idx + 1}) Image {image_name}\t[{cover_percentage:.4f}/{stego_percentage:.4f}] \tSTEGO')
+        })
+        # print(f'Image {image_name}\t[{cover_percentage:.4f}/{stego_percentage:.4f}] \tSTEGO')
 
 
 if __name__ == '__main__':
@@ -116,11 +119,18 @@ if __name__ == '__main__':
         default=max(list(AD_NET_VERSIONS.keys()))
     )
     parser.add_argument(
-        '-m', '--model_path',
+        '-m', '--model',
         help='path to model',
         required=False,
         default=DEFAULT_MODEL_DIR + '/' + DEFAULT_MODEL_NAME
     )
 
     args = parser.parse_args()
-    predict(args.model_path, args.image, args.version)
+
+    try:
+        predict(args.model, args.image, args.version)
+    except Exception as e:
+        error = {'errorMessage': e.__str__()}
+        sys.stderr.write(json.dumps(error))
+        sys.stderr.flush()
+        exit(-1)
