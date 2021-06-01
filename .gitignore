@@ -5,3 +5,5 @@
 /__pycache__/
 /acc_and_loss/
 /resized/
+/cnn/__pycache__/
+/cnn/versions/
